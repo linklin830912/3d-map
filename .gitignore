@@ -1,0 +1,21 @@
+# Client
+client/node_modules
+client/.cache
+client/.vscode
+client/dist
+
+# Server
+server/.vscode
+server/build
+
+# CMake and vcpkg generated files
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/compile_commands.json
+**/cmake-build-*/
+server/vcpkg_installed/
+
+# Local environment secrets
+.env
+.env.*
