@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 
 import {
-  FRAGMEN_SHADER_SOURCE,
-  VERTEX_SHADER_SOURCE,
-} from "../engine/graphics/shaders";
+  FRAGMEN_SHADER_SIMPLE,
+  VERTEX_SHADER_SIMPLE,
+} from "../engine/graphics/shaders/simpleShader";
 
 import { createShader } from "../engine/graphics/createShader";
 import { renderTileMeshes } from "../engine/globe/renderTileMeshes";
@@ -33,13 +33,13 @@ export default function MapCanvas() {
     const vertexShader = createShader(
       gl,
       gl.VERTEX_SHADER,
-      VERTEX_SHADER_SOURCE,
+      VERTEX_SHADER_SIMPLE,
     );
 
     const fragmentShader = createShader(
       gl,
       gl.FRAGMENT_SHADER,
-      FRAGMEN_SHADER_SOURCE,
+      FRAGMEN_SHADER_SIMPLE,
     );
 
     const program = gl.createProgram();

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import MapCanvas from "../components/MapCanvas";
 import "../styles/global.css";
+import GlobeCanvas from "../components/GlobeCanvas";
 
 function App() {
   useEffect(() => {
@@ -27,7 +28,8 @@ function App() {
       </header>
 
       <section className="map-container">
-        <MapCanvas />
+        {/* <MapCanvas /> */}
+        <GlobeCanvas />
       </section>
     </main>
   );

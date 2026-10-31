@@ -5,8 +5,7 @@ import {
   tileYToLatitude,
 } from "../math/latlong";
 import { EPSILON } from "../math/mat4";
-
-const TILE_SEGMENT = 16;
+import { TILE_SEGMENT } from "./type";
 
 export type Mesh = {
   z: number;

@@ -12,3 +12,5 @@ export type GpuTile = {
   y: number;
   z: number;
 };
+
+export const TILE_SEGMENT = 16;
