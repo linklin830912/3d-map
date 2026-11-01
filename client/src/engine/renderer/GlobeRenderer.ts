@@ -6,6 +6,7 @@ import {
 } from "../graphics/shaders/globeShader";
 import { createTileInstance } from "../globe/createTileInstance";
 import { getTileInstanceLocation } from "../globe/getTileInstanceLocation";
+import { addTileDebugOverlay } from "../graphics/loadTileTexture";
 
 export interface IRenderer {
   draw(mvp: Float32Array): void;
@@ -188,7 +189,7 @@ export class GlobeRenderer implements IRenderer {
       throw new Error("Renderer is not initialized");
     }
 
-    // 1. Generate tile instance data for all geographic ranges.
+    // 1. Generate tile instance data.
     const instanceData = getTileInstanceLocation(
       zoom,
       longitudeRange,
@@ -203,12 +204,7 @@ export class GlobeRenderer implements IRenderer {
     }
 
     // 2. Extract tile coordinates.
-
-    const tileCoordinates: {
-      x: number;
-      y: number;
-      z: number;
-    }[] = [];
+    const tileCoordinates = [];
 
     for (let i = 0; i < instanceCount; i++) {
       const offset = i * floatsPerInstance;
@@ -220,39 +216,57 @@ export class GlobeRenderer implements IRenderer {
       });
     }
 
-    // 3. Load corresponding OSM images.
-
-    const images = await Promise.all(
-      tileCoordinates.map(({ x, y, z }) => getOpenStreetMapTile(x, y, z)),
-    );
+    const images: {
+      image: ImageBitmap | null;
+      x: number;
+      y: number;
+      z: number;
+    }[] = [];
 
     let newTextureArray: WebGLTexture | null = null;
 
     try {
+      // 3. Load corresponding OSM images.
+      const loadedImages = await Promise.all(
+        tileCoordinates.map(async ({ x, y, z }) => ({
+          image: await getOpenStreetMapTile(x, y, z),
+          x,
+          y,
+          z,
+        })),
+      );
+
+      images.push(...loadedImages);
+
       if (this.disposed) {
         throw new Error("Renderer was disposed while loading tiles");
       }
 
-      if (images.length === 0 || images[0] == null) {
+      if (images.length !== instanceCount || !images[0]?.image) {
         throw new Error("Failed to load map tiles");
       }
 
-      const firstImage = images[0];
+      const firstImage = images[0].image;
       const width = firstImage.width;
       const height = firstImage.height;
 
-      for (const image of images) {
-        if (image == null) {
-          throw new Error("One or more map tiles failed to load");
+      // Verify all tiles loaded and have matching dimensions.
+      for (const imageData of images) {
+        if (!imageData.image) {
+          throw new Error(
+            `Failed to load tile ${imageData.z}/${imageData.x}/${imageData.y}`,
+          );
         }
 
-        if (image.width !== width || image.height !== height) {
+        if (
+          imageData.image.width !== width ||
+          imageData.image.height !== height
+        ) {
           throw new Error("All map tiles must have equal dimensions");
         }
       }
 
       // 4. Create a new texture array.
-
       newTextureArray = gl.createTexture();
 
       if (!newTextureArray) {
@@ -289,12 +303,21 @@ export class GlobeRenderer implements IRenderer {
         gl.CLAMP_TO_EDGE,
       );
 
-      // 5. Upload each image into its corresponding texture layer.
+      // 5. Process and upload each tile.
+      for (let layer = 0; layer < images.length; layer++) {
+        const imageData = images[layer];
+        const image = imageData.image;
 
-      images.forEach((image, layer) => {
-        if (image == null) {
-          return;
+        if (!image) {
+          throw new Error("Missing tile image");
         }
+
+        const debugImage = await addTileDebugOverlay(
+          image,
+          imageData.x,
+          imageData.y,
+          imageData.z,
+        );
 
         gl.texSubImage3D(
           gl.TEXTURE_2D_ARRAY,
@@ -307,14 +330,13 @@ export class GlobeRenderer implements IRenderer {
           1,
           gl.RGBA,
           gl.UNSIGNED_BYTE,
-          image,
+          debugImage,
         );
-      });
+      }
 
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
 
-      // 6. Upload the new instance data.
-
+      // 6. Upload instance data.
       gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
 
       gl.bufferData(gl.ARRAY_BUFFER, instanceData, gl.STATIC_DRAW);
@@ -322,15 +344,12 @@ export class GlobeRenderer implements IRenderer {
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
       // 7. Replace the previous texture array.
-
       const previousTextureArray = this.textureArray;
 
       this.textureArray = newTextureArray;
       newTextureArray = null;
 
       this.instanceCount = instanceCount;
-
-      // Update the renderer's state only after successful preparation.
 
       this.zoom = zoom;
       this.longitudeRange = longitudeRange;
@@ -348,36 +367,32 @@ export class GlobeRenderer implements IRenderer {
 
       throw error;
     } finally {
-      // Release CPU-side image resources.
-
-      for (const image of images) {
-        if (image && "close" in image && typeof image.close === "function") {
-          image.close();
-        }
+      // 8. Release CPU-side image resources.
+      for (const imageData of images) {
+        imageData.image?.close();
       }
     }
   }
 
   async updateZoom(
-    // zoom: number,
-    longitudeRange: [number, number][],
-    latitudeRange: [number, number][],
+    zoom: number,
+    // longitudeRange: [number, number][],
+    // latitudeRange: [number, number][],
   ): Promise<void> {
     if (this.disposed) {
       throw new Error("Cannot update a disposed renderer");
     }
 
     if (
-      // zoom === this.zoom &&
-      longitudeRange === this.longitudeRange &&
-      latitudeRange === this.latitudeRange
+      zoom === this.zoom //&&
+      // longitudeRange === this.longitudeRange &&
+      // latitudeRange === this.latitudeRange
     ) {
       return;
     }
-    // this.zoom = zoom;
-    this.longitudeRange = longitudeRange;
-    this.latitudeRange = latitudeRange;
-
+    this.zoom = zoom;
+    // this.longitudeRange = longitudeRange;
+    // this.latitudeRange = latitudeRange;
     await this.updateTileData(
       this.zoom,
       this.longitudeRange,

@@ -15,11 +15,11 @@ export async function renderTileMeshes(
   // const textureArray = createTileTextureArray(gl, tiles.length);
 
   const tiles = await Promise.all(
-    meshes.map(async (mesh): Promise<GpuTile> => {
+    meshes.map(async (mesh, layer): Promise<GpuTile> => {
       const geometry = createGpuResources(gl, program, mesh);
       const texture = createGpuTexture(gl);
 
-      await loadTileTexture(gl, texture, mesh.x, mesh.y, mesh.z);
+      await loadTileTexture(gl, texture, layer, mesh.x, mesh.y, mesh.z);
 
       return {
         geometry,

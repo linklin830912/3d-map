@@ -40,7 +40,6 @@ export default function GlobeCanvas() {
     }
     animationFrameRef.current = requestAnimationFrame(() => {
       animationFrameRef.current = null;
-
       if (
         disposedRef.current ||
         !canvasRef.current ||
@@ -50,7 +49,6 @@ export default function GlobeCanvas() {
       ) {
         return;
       }
-
       const canvas = canvasRef.current;
       const renderer = globeRendererRef.current;
       const aspectRatio = canvas.width / canvas.height;
@@ -81,7 +79,6 @@ export default function GlobeCanvas() {
       );
 
       const mvp = multiply(projection, multiply(view, model));
-
       renderer.draw(mvp);
     });
   }, []);
@@ -153,7 +150,7 @@ export default function GlobeCanvas() {
     }
   };
 
-  const handleWheel = (event: WheelEvent) => {
+  const handleWheel = async (event: WheelEvent) => {
     event.preventDefault();
 
     cameraDistanceRef.current += event.deltaY * ZOOM_SPEED;
@@ -163,12 +160,20 @@ export default function GlobeCanvas() {
     );
 
     if (globeRendererRef.current && canvasRef.current) {
-      // const radius = getGlobeRadius(
-      //   cameraDistanceRef.current,
-      //   canvasRef.current?.height,
-      //   FOV,
-      // );
-      // console.log("!!!radius", radius);
+      const radius = getGlobeRadius(
+        cameraDistanceRef.current,
+        canvasRef.current?.height,
+        FOV,
+      );
+
+      let zoom = 0;
+      if (radius < 500) {
+        zoom = 2;
+      } else if (radius < 800) {
+        zoom = 3;
+      } else {
+        zoom = 4;
+      }
       //!!!TODO: bug
       // const options = {
       //   canvasWidth: canvasRef.current.width,
@@ -179,10 +184,11 @@ export default function GlobeCanvas() {
       // };
       // const lonlat = screenToGeo(options);
       // if (!lonlat) return;
-      // globeRendererRef.current.updateZoom(
-      //   lonlat.longitudeRange,
-      //   lonlat.latitudeRange,
-      // );
+      await globeRendererRef.current.updateZoom(
+        zoom,
+        // lonlat.longitudeRange,
+        // lonlat.latitudeRange,
+      );
     }
 
     requestRender();
