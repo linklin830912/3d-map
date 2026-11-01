@@ -5,7 +5,7 @@ export function getLat(latitude: number) {
     Math.min(MAX_MERCATOR_LATITUDE, latitude),
   );
 }
-export function lonLatToTile(
+export function lonLatToPosition(
   longitude: number,
   latitude: number,
   zoom: number,
@@ -21,6 +21,18 @@ export function lonLatToTile(
   const y = Math.floor(((1 - Math.asinh(Math.tan(latRad)) / Math.PI) / 2) * n);
 
   return { x, y, z: zoom };
+}
+
+/**
+ * Converts a unit sphere position into geographic coordinates.
+ *
+ * Matches the coordinate convention in VERTEX_SHADER_GLOBE.
+ */
+export function positionToLonLat(x: number, y: number, z: number) {
+  return {
+    longitude: Math.atan2(z, -x),
+    latitude: Math.asin(Math.max(-1, Math.min(1, y))),
+  };
 }
 
 export function tileYToLatitude(tileY: number, zoom: number): number {

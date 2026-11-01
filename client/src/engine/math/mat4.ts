@@ -55,3 +55,17 @@ export function multiply(a: Float32Array, b: Float32Array): Float32Array {
 
   return result;
 }
+
+/**
+ * Converts radians to degrees.
+ */
+export function radiansToDegrees(radians: number): number {
+  return (radians * 180) / Math.PI;
+}
+
+/**
+ * Converts degrees to radians.
+ */
+export function degreesToRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}

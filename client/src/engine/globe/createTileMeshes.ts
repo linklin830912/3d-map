@@ -1,6 +1,6 @@
 import {
   getLat,
-  lonLatToTile,
+  lonLatToPosition,
   tileXToLongitude,
   tileYToLatitude,
 } from "../math/latlong";
@@ -91,8 +91,8 @@ export function createTileMeshes(
 
   const n = 2 ** zoom;
 
-  const topLeft = lonLatToTile(west, north, zoom);
-  const bottomRight = lonLatToTile(east - EPSILON, south + EPSILON, zoom);
+  const topLeft = lonLatToPosition(west, north, zoom);
+  const bottomRight = lonLatToPosition(east - EPSILON, south + EPSILON, zoom);
 
   const meshes: Mesh[] = [];
 

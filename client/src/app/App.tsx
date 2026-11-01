@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import MapCanvas from "../components/MapCanvas";
 import "../styles/global.css";
-import GlobeCanvas from "../components/GlobeCanvas";
+import GlobeCanvas from "../components/globe/GlobeCanvas";
 
 function App() {
   useEffect(() => {
