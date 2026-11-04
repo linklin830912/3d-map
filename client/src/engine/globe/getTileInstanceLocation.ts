@@ -1,17 +1,19 @@
 import { getLat, lonLatToPosition } from "../math/latlong";
 import { EPSILON } from "../math/mat4";
+import { tileKey, type TileCoord } from "./tileCache";
 
-export function getTileInstanceLocation(
+/**
+ * Returns the unique XYZ tiles that cover the given geographic ranges.
+ */
+export function getVisibleTiles(
   zoom: number,
   longitudeRange: [number, number][],
   latitudeRange: [number, number][],
-): Float32Array {
+): TileCoord[] {
   const n = 2 ** zoom;
 
-  const instanceData: number[] = [];
+  const tiles: TileCoord[] = [];
   const visitedTiles = new Set<string>();
-
-  let textureLayer = 0;
 
   for (const [west, east] of longitudeRange) {
     for (const [southValue, northValue] of latitudeRange) {
@@ -28,28 +30,43 @@ export function getTileInstanceLocation(
 
       for (let y = topLeft.y; y <= bottomRight.y; y++) {
         for (let x = topLeft.x; x <= bottomRight.x; x++) {
-          // Ignore tiles outside the valid XYZ tile range.
           if (x < 0 || x >= n || y < 0 || y >= n) {
             continue;
           }
 
-          // Avoid duplicate tiles if geographic ranges overlap.
-          const tileKey = `${zoom}/${x}/${y}`;
+          const key = tileKey(x, y, zoom);
 
-          if (visitedTiles.has(tileKey)) {
+          if (visitedTiles.has(key)) {
             continue;
           }
 
-          visitedTiles.add(tileKey);
-
-          // Store tile coordinates and corresponding texture layer.
-          instanceData.push(x, y, zoom, textureLayer);
-
-          textureLayer++;
+          visitedTiles.add(key);
+          tiles.push({ x, y, z: zoom });
         }
       }
     }
   }
 
-  return new Float32Array(instanceData);
+  return tiles;
+}
+
+/**
+ * Builds instanced attribute data: [x, y, z, textureLayer] per tile.
+ */
+export function buildTileInstanceData(
+  tiles: Array<TileCoord & { layer: number }>,
+): Float32Array {
+  const instanceData = new Float32Array(tiles.length * 4);
+
+  for (let i = 0; i < tiles.length; i++) {
+    const tile = tiles[i];
+    const offset = i * 4;
+
+    instanceData[offset] = tile.x;
+    instanceData[offset + 1] = tile.y;
+    instanceData[offset + 2] = tile.z;
+    instanceData[offset + 3] = tile.layer;
+  }
+
+  return instanceData;
 }

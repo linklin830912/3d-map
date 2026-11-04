@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import MapCanvas from "../components/MapCanvas";
 import "../styles/global.css";
 import GlobeCanvas from "../components/globe/GlobeCanvas";
 
@@ -13,11 +12,13 @@ function App() {
           throw new Error(`HTTP error: ${response.status}`);
         }
 
-        const data = await response.json();
-      } catch (err) {}
+        await response.json();
+      } catch {
+        // Health check is best-effort during local dev.
+      }
     };
 
-    checkHealth();
+    void checkHealth();
   }, []);
 
   return (
@@ -28,7 +29,6 @@ function App() {
       </header>
 
       <section className="map-container">
-        {/* <MapCanvas /> */}
         <GlobeCanvas />
       </section>
     </main>

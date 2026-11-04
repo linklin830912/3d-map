@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   multiply,
   perspective,
@@ -17,6 +17,23 @@ import { FOV } from "../../const/camera";
 import { getGlobeRadius } from "../../engine/globe/getGlobeRadius";
 import { screenToGeo } from "../../engine/globe/screenToGeo";
 
+function zoomFromCameraDistance(
+  cameraDistance: number,
+  canvasHeight: number,
+): number {
+  const radius = getGlobeRadius(cameraDistance, canvasHeight, FOV);
+
+  if (radius < 500) {
+    return 2;
+  }
+
+  if (radius < 800) {
+    return 3;
+  }
+
+  return 4;
+}
+
 export default function GlobeCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -25,6 +42,8 @@ export default function GlobeCanvas() {
   const globeRendererRef = useRef<GlobeRenderer | null>(null);
 
   const animationFrameRef = useRef<number | null>(null);
+
+  const tileSyncFrameRef = useRef<number | null>(null);
 
   const rotationAngleRef = useRef<[number, number]>([0.25, 0]);
 
@@ -83,6 +102,70 @@ export default function GlobeCanvas() {
     });
   }, []);
 
+  const syncTiles = useCallback(() => {
+    const canvas = canvasRef.current;
+    const renderer = globeRendererRef.current;
+
+    if (!canvas || !renderer || disposedRef.current) {
+      return;
+    }
+
+    const options = {
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      cameraDistance: cameraDistanceRef.current,
+      rotationX: rotationAngleRef.current[0],
+      rotationY: rotationAngleRef.current[1],
+    };
+
+    const lonlat = screenToGeo(options);
+
+    if (!lonlat) {
+      return;
+    }
+
+    const zoom = zoomFromCameraDistance(
+      cameraDistanceRef.current,
+      canvas.height,
+    );
+
+    // Latest-wins: renderer aborts any previous in-flight fetch generation.
+    void renderer
+      .update(zoom, lonlat.longitudeRange, lonlat.latitudeRange)
+      .then(() => {
+        if (!disposedRef.current) {
+          requestRender();
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("Failed to sync globe tiles:", error);
+      });
+  }, [requestRender]);
+
+  /**
+   * Coalesce pan/zoom tile syncs to once per animation frame so a fast wheel
+   * burst only commits the final camera state (older fetches are aborted).
+   */
+  const scheduleTileSync = useCallback(() => {
+    if (tileSyncFrameRef.current !== null) {
+      return;
+    }
+
+    tileSyncFrameRef.current = requestAnimationFrame(() => {
+      tileSyncFrameRef.current = null;
+      syncTiles();
+    });
+  }, [syncTiles]);
+
+  useEffect(() => {
+    return () => {
+      if (tileSyncFrameRef.current !== null) {
+        cancelAnimationFrame(tileSyncFrameRef.current);
+        tileSyncFrameRef.current = null;
+      }
+    };
+  }, []);
+
   const resize = useCallback(
     (gl: WebGL2RenderingContext) => {
       const canvas = canvasRef.current;
@@ -104,8 +187,9 @@ export default function GlobeCanvas() {
       }
 
       requestRender();
+      scheduleTileSync();
     },
-    [requestRender],
+    [requestRender, scheduleTileSync],
   );
 
   const handlePointerDown = (event: PointerEvent) => {
@@ -138,6 +222,7 @@ export default function GlobeCanvas() {
     previousPosRef.current = [event.clientX, event.clientY];
 
     requestRender();
+    scheduleTileSync();
   };
 
   const handlePointerUp = () => {
@@ -150,7 +235,7 @@ export default function GlobeCanvas() {
     }
   };
 
-  const handleWheel = async (event: WheelEvent) => {
+  const handleWheel = (event: WheelEvent) => {
     event.preventDefault();
 
     cameraDistanceRef.current += event.deltaY * ZOOM_SPEED;
@@ -159,39 +244,8 @@ export default function GlobeCanvas() {
       Math.min(MAX_CAMERA_DISTANCE, cameraDistanceRef.current),
     );
 
-    if (globeRendererRef.current && canvasRef.current) {
-      const radius = getGlobeRadius(
-        cameraDistanceRef.current,
-        canvasRef.current?.height,
-        FOV,
-      );
-
-      let zoom = 0;
-      if (radius < 500) {
-        zoom = 2;
-      } else if (radius < 800) {
-        zoom = 3;
-      } else {
-        zoom = 4;
-      }
-      //!!!TODO: bug
-      // const options = {
-      //   canvasWidth: canvasRef.current.width,
-      //   canvasHeight: canvasRef.current.height,
-      //   cameraDistance: cameraDistanceRef.current,
-      //   rotationX: rotationAngleRef.current[0],
-      //   rotationY: rotationAngleRef.current[1],
-      // };
-      // const lonlat = screenToGeo(options);
-      // if (!lonlat) return;
-      await globeRendererRef.current.updateZoom(
-        zoom,
-        // lonlat.longitudeRange,
-        // lonlat.latitudeRange,
-      );
-    }
-
     requestRender();
+    scheduleTileSync();
   };
 
   useGlobeInit(

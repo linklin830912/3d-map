@@ -38,6 +38,7 @@ export function useGlobeInit(
     const initialize = async () => {
       try {
         rendererRef.current = await GlobeRenderer.create(gl, 2);
+        rendererRef.current.setRenderRequest(requestRender);
 
         if (disposedRef.current) {
           rendererRef.current.dispose();
